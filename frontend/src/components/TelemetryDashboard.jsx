@@ -57,7 +57,8 @@ const dashboardStyle = {
     padding: '20px',
     zIndex: 10,
     boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
-    borderRadius: '8px'
+    borderRadius: '8px',
+    pointerEvents: 'auto'
 };
 
 const headerStyle = {

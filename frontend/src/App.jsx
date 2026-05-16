@@ -48,9 +48,11 @@ function App() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', backgroundColor: '#02050A', margin: 0, padding: 0, overflow: 'hidden' }}>
-      <ControlPanel />
-      <TelemetryDashboard />
-      <StatusOverlay />
+      <div style={{ position: 'absolute', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 10, pointerEvents: 'none' }}>
+        <ControlPanel />
+        <TelemetryDashboard />
+        <StatusOverlay />
+      </div>
       <Scene />
     </div>
   );

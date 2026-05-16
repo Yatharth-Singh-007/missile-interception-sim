@@ -132,7 +132,7 @@ function EngagementScene() {
 
 export default function Scene() {
     return (
-        <div style={{ width: '100vw', height: '100vh', position: 'absolute', top: 0, left: 0, zIndex: 1 }}>
+        <div style={{ width: '100vw', height: '100vh', position: 'absolute', top: 0, left: 0, zIndex: 0 }}>
             <Canvas camera={{ position: [70, 50, 90], fov: 50 }}>
                 {/* Deep Navy/Black Void */}
                 <color attach="background" args={['#02050A']} />

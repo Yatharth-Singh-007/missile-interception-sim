@@ -99,7 +99,8 @@ const panelStyle = {
     padding: '20px 30px',
     zIndex: 10,
     boxShadow: '0 10px 30px rgba(0,0,0,0.5), inset 0 0 20px rgba(0, 240, 255, 0.05)',
-    borderRadius: '8px'
+    borderRadius: '8px',
+    pointerEvents: 'auto'
 };
 
 const inputGroup = {

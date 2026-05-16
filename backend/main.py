@@ -46,7 +46,8 @@ class SimulationManager:
         for connection in list(self.active_connections):
             try:
                 await connection.send_json(message)
-            except WebSocketDisconnect:
+            except (WebSocketDisconnect, RuntimeError, Exception) as e:
+                print(f"Error broadcasting to connection, disconnecting: {e}")
                 self.disconnect(connection)
 
     def set_time_scale(self, time_scale: float):
