@@ -18,21 +18,47 @@ app.add_middleware(
 )
 
 class StartRequest(BaseModel):
-    threat_type: str
-    n_constant: float
+    target_profile: str
+    guidance_mode: str
+    target_velocity: float
+    interceptor_velocity: float
     time_scale: float
+
+class SimulationPair:
+    def __init__(self, index, target_profile, guidance_mode, target_velocity, interceptor_velocity):
+        self.index = index
+        self.target_profile = target_profile
+        self.guidance_mode = guidance_mode
+        self.target_velocity = target_velocity
+        self.interceptor_velocity = interceptor_velocity
+        self.state = get_initial_state(index, target_velocity, interceptor_velocity)
+        self.evasion_state = EvasionState(target_profile)
+        self.status = "ACTIVE"
+        self.n_constant = 4.0 # Default PN constant
+
+    def step(self, t, dt):
+        if self.status != "ACTIVE":
+            return
+
+        self.state = rk4_step(t, self.state, dt, self.target_profile, self.guidance_mode, self.n_constant, self.evasion_state, self.target_velocity, self.interceptor_velocity)
+
+        pos_tgt = self.state[0:3]
+        pos_int = self.state[6:9]
+
+        distance = np.linalg.norm(pos_tgt - pos_int)
+        if distance < 15.0:
+            self.status = "INTERCEPTED"
+        elif pos_tgt[1] <= 0.0:
+            self.status = "IMPACT"
 
 class SimulationManager:
     def __init__(self):
         self.active_connections = []
         self.running = False
-        self.state = None
+        self.pairs = []
         self.time = 0.0
-        self.threat_type = 'cruise'
-        self.n_constant = 4.0
         self.time_scale = 5.0
         self.task = None
-        self.evasion_state = None
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -53,13 +79,16 @@ class SimulationManager:
     def set_time_scale(self, time_scale: float):
         self.time_scale = time_scale
 
-    def start_simulation(self, threat_type: str, n_constant: float, time_scale: float):
-        self.threat_type = threat_type
-        self.n_constant = n_constant
-        self.time_scale = time_scale
-        self.state = get_initial_state(self.threat_type)
-        self.evasion_state = EvasionState()
+    def start_simulation(self, request: StartRequest):
+        self.time_scale = request.time_scale
         self.time = 0.0
+
+        # Spawn 3 pairs
+        self.pairs = [
+            SimulationPair(i, request.target_profile, request.guidance_mode, request.target_velocity, request.interceptor_velocity)
+            for i in range(3)
+        ]
+
         self.running = True
         
         if self.task is None or self.task.done():
@@ -75,67 +104,70 @@ class SimulationManager:
         while self.running:
             start_time = time.time()
             
-            # Integration step
             dt_sim = dt_real * self.time_scale
-            self.state = rk4_step(self.time, self.state, dt_sim, self.threat_type, self.n_constant, self.evasion_state)
-            self.time += dt_sim
             
-            # Extract state
-            pos_tgt = self.state[0:3]
-            vel_tgt = self.state[3:6]
-            pos_int = self.state[6:9]
-            vel_int = self.state[9:12]
+            all_finished = True
+            targets_data = []
+            interceptors_data = []
             
-            # Check intercept
-            distance = np.linalg.norm(pos_tgt - pos_int)
-            intercepted = distance < 15.0
-            ground_impact = pos_tgt[1] <= 0.0
-            
-            status = "ACTIVE"
-            if intercepted:
-                status = "INTERCEPTED"
-            elif ground_impact:
-                status = "IMPACT"
-            
-            # Calculate telemetry
-            R_vec = pos_tgt - pos_int
-            V_rel = vel_tgt - vel_int
-            closing_vel = -np.dot(R_vec / distance, V_rel) if distance > 0 else 0.0
-            
-            omega_mag = np.linalg.norm(np.cross(R_vec, V_rel) / (distance**2)) if distance > 0 else 0.0
-            
-            # Approx target G-force
-            v_mag = np.linalg.norm(vel_tgt)
-            if v_mag > 0:
-                # Use simplified lateral G estimation for UI based on recent jink state
-                g_force = 50.0 * self.evasion_state.get_jink_multiplier(self.time) / 9.81 if self.threat_type == 'cruise' else (15.0 * self.evasion_state.get_jink_multiplier(self.time) if self.threat_type == 'marv' else 0.0)
-            else:
+            for pair in self.pairs:
+                pair.step(self.time, dt_sim)
+                if pair.status == "ACTIVE":
+                    all_finished = False
+
+                pos_tgt = pair.state[0:3]
+                vel_tgt = pair.state[3:6]
+                pos_int = pair.state[6:9]
+                vel_int = pair.state[9:12]
+
+                distance = np.linalg.norm(pos_tgt - pos_int)
+                R_vec = pos_tgt - pos_int
+                V_rel = vel_tgt - vel_int
+                closing_vel = -np.dot(R_vec / distance, V_rel) if distance > 0 else 0.0
+                omega_mag = np.linalg.norm(np.cross(R_vec, V_rel) / (distance**2)) if distance > 0 else 0.0
+
+                v_mag = np.linalg.norm(vel_tgt)
                 g_force = 0.0
-            
-            payload = {
-                "status": status,
-                "time": self.time,
-                "target": {
+                if v_mag > 0 and pair.status == "ACTIVE":
+                    if pair.target_profile == 'zigzag':
+                        g_force = 50.0 / 9.81
+                    else:
+                        g_force = 50.0 * pair.evasion_state.get_jink_multiplier(self.time) / 9.81
+
+                targets_data.append({
+                    "id": pair.index,
                     "pos": pos_tgt.tolist(),
                     "vel": vel_tgt.tolist(),
                     "alt": pos_tgt[1],
-                    "g_force": abs(g_force)
-                },
-                "interceptor": {
+                    "g_force": abs(g_force),
+                    "status": pair.status
+                })
+
+                interceptors_data.append({
+                    "id": pair.index,
                     "pos": pos_int.tolist(),
                     "vel": vel_int.tolist(),
-                    "alt": pos_int[1]
-                },
-                "telemetry": {
+                    "alt": pos_int[1],
                     "distance": distance,
                     "closing_velocity": closing_vel,
                     "los_rate": omega_mag
-                }
+                })
+
+            self.time += dt_sim
+
+            # Use the first pair's status as the global status for compatibility, or 'FINISHED' if all done
+            global_status = "ACTIVE" if not all_finished else "FINISHED"
+
+            payload = {
+                "status": global_status,
+                "time": self.time,
+                "targets": targets_data,
+                "interceptors": interceptors_data
             }
             
             await self.broadcast(payload)
             
-            if intercepted or ground_impact:
+            if all_finished:
                 self.running = False
                 break
                 
@@ -147,8 +179,8 @@ manager = SimulationManager()
 
 @app.post("/api/start")
 async def start_sim(request: StartRequest):
-    manager.start_simulation(request.threat_type, request.n_constant, request.time_scale)
-    return {"status": "started", "config": request.dict()}
+    manager.start_simulation(request)
+    return {"status": "started"}
 
 @app.post("/api/stop")
 async def stop_sim():
@@ -168,6 +200,6 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            await websocket.receive_text() # Keep connection alive
+            await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)

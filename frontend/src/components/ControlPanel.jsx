@@ -2,7 +2,10 @@ import React from 'react';
 import { useSimStore } from '../store/useSimStore';
 
 export function ControlPanel() {
-    const { threatType, nConstant, timeScale, setThreatType, setNConstant, setTimeScale, status } = useSimStore();
+    const {
+        targetProfile, guidanceMode, targetVelocity, interceptorVelocity, timeScale, status,
+        setTargetProfile, setGuidanceMode, setTargetVelocity, setInterceptorVelocity, setTimeScale
+    } = useSimStore();
 
     const startSimulation = async () => {
         try {
@@ -10,8 +13,10 @@ export function ControlPanel() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    threat_type: threatType,
-                    n_constant: parseFloat(nConstant),
+                    target_profile: targetProfile,
+                    guidance_mode: guidanceMode,
+                    target_velocity: parseFloat(targetVelocity),
+                    interceptor_velocity: parseFloat(interceptorVelocity),
                     time_scale: parseFloat(timeScale)
                 })
             });
@@ -30,28 +35,90 @@ export function ControlPanel() {
 
     return (
         <div style={panelStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={inputGroup}>
-                    <label>THREAT PROFILE</label>
-                    <select value={threatType} onChange={e => setThreatType(e.target.value)} style={inputStyle}>
-                        <option value="cruise">CRUISE MISSILE</option>
-                        <option value="srbm">SRBM</option>
-                        <option value="marv">MaRV</option>
-                    </select>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px' }}>
+
+                <div style={sectionStyle}>
+                    <label style={labelStyle}>TARGET PROFILE</label>
+                    <div style={radioGroupStyle}>
+                        <label style={radioLabelStyle}>
+                            <input
+                                type="radio"
+                                name="targetProfile"
+                                value="linear"
+                                checked={targetProfile === 'linear'}
+                                onChange={e => setTargetProfile(e.target.value)}
+                                style={radioStyle}
+                            />
+                            LINEAR
+                        </label>
+                        <label style={radioLabelStyle}>
+                            <input
+                                type="radio"
+                                name="targetProfile"
+                                value="zigzag"
+                                checked={targetProfile === 'zigzag'}
+                                onChange={e => setTargetProfile(e.target.value)}
+                                style={radioStyle}
+                            />
+                            ZIGZAG
+                        </label>
+                    </div>
                 </div>
 
-                <div style={inputGroup}>
-                    <label>APN GAIN (N)</label>
-                    <input 
-                        type="number" step="0.1" min="1.0" max="10.0"
-                        value={nConstant} 
-                        onChange={e => setNConstant(e.target.value)} 
-                        style={inputStyle}
-                    />
+                <div style={sectionStyle}>
+                    <label style={labelStyle}>GUIDANCE MODE</label>
+                    <div style={radioGroupStyle}>
+                        <label style={radioLabelStyle}>
+                            <input
+                                type="radio"
+                                name="guidanceMode"
+                                value="los"
+                                checked={guidanceMode === 'los'}
+                                onChange={e => setGuidanceMode(e.target.value)}
+                                style={radioStyle}
+                            />
+                            LOS / PURSUIT
+                        </label>
+                        <label style={radioLabelStyle}>
+                            <input
+                                type="radio"
+                                name="guidanceMode"
+                                value="pn"
+                                checked={guidanceMode === 'pn'}
+                                onChange={e => setGuidanceMode(e.target.value)}
+                                style={radioStyle}
+                            />
+                            PROPORTIONAL NAV
+                        </label>
+                    </div>
                 </div>
 
-                <div style={{...inputGroup, width: '200px'}}>
-                    <label>TIME WARP: {timeScale}x</label>
+                <div style={sectionStyle}>
+                    <label style={labelStyle}>ENGAGEMENT PARAMETERS</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={sliderContainerStyle}>
+                            <label style={sliderLabelStyle}>TGT VEL: {targetVelocity} m/s</label>
+                            <input
+                                type="range" min="100" max="1000" step="50"
+                                value={targetVelocity}
+                                onChange={e => setTargetVelocity(e.target.value)}
+                                style={sliderStyle}
+                            />
+                        </div>
+                        <div style={sliderContainerStyle}>
+                            <label style={sliderLabelStyle}>INT VEL: {interceptorVelocity} m/s</label>
+                            <input
+                                type="range" min="500" max="3000" step="100"
+                                value={interceptorVelocity}
+                                onChange={e => setInterceptorVelocity(e.target.value)}
+                                style={sliderStyle}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{...sectionStyle, borderRight: 'none'}}>
+                    <label style={labelStyle}>TIME WARP: {timeScale}x</label>
                     <input 
                         type="range" min="1" max="20" step="1"
                         value={timeScale} 
@@ -72,12 +139,12 @@ export function ControlPanel() {
                         }} 
                         style={sliderStyle}
                     />
+                    <div style={{display: 'flex', gap: '10px', marginTop: '15px'}}>
+                        <button onClick={startSimulation} style={btnLaunch}>ENGAGE</button>
+                        <button onClick={stopSimulation} style={btnAbort}>ABORT</button>
+                    </div>
                 </div>
 
-                <div style={{display: 'flex', gap: '15px'}}>
-                    <button onClick={startSimulation} style={btnLaunch}>ENGAGE</button>
-                    <button onClick={stopSimulation} style={btnAbort}>ABORT</button>
-                </div>
             </div>
         </div>
     );
@@ -88,71 +155,97 @@ const panelStyle = {
     bottom: '20px',
     left: '50%',
     transform: 'translateX(-50%)',
-    width: '80%',
-    maxWidth: '900px',
-    background: 'rgba(5, 10, 20, 0.65)',
+    width: '95%',
+    maxWidth: '1200px',
+    background: 'rgba(0, 15, 0, 0.85)',
     backdropFilter: 'blur(10px)',
-    border: '1px solid rgba(0, 240, 255, 0.3)',
-    borderTop: '2px solid #00F0FF',
-    color: '#00F0FF',
-    fontFamily: '"Rajdhani", sans-serif',
-    padding: '20px 30px',
+    border: '1px solid rgba(0, 255, 0, 0.4)',
+    borderTop: '3px solid #00FF00',
+    color: '#00FF00',
+    fontFamily: '"Courier New", Courier, monospace',
+    padding: '20px',
     zIndex: 10,
-    boxShadow: '0 10px 30px rgba(0,0,0,0.5), inset 0 0 20px rgba(0, 240, 255, 0.05)',
-    borderRadius: '8px',
+    boxShadow: '0 0 20px rgba(0, 255, 0, 0.2), inset 0 0 10px rgba(0, 255, 0, 0.1)',
     pointerEvents: 'auto'
 };
 
-const inputGroup = {
+const sectionStyle = {
     display: 'flex',
     flexDirection: 'column',
-    gap: '5px',
-    fontSize: '14px',
-    fontWeight: '600',
-    letterSpacing: '1px'
+    flex: 1,
+    paddingRight: '20px',
+    borderRight: '1px dashed rgba(0, 255, 0, 0.3)'
 };
 
-const inputStyle = {
-    background: 'rgba(0,0,0,0.5)',
-    color: '#FFF',
-    border: '1px solid rgba(0, 240, 255, 0.5)',
-    padding: '8px 12px',
-    fontFamily: '"Orbitron", sans-serif',
+const labelStyle = {
     fontSize: '14px',
-    outline: 'none',
-    borderRadius: '4px',
-    transition: 'all 0.3s ease'
+    fontWeight: 'bold',
+    letterSpacing: '1px',
+    marginBottom: '15px',
+    textShadow: '0 0 5px #00FF00'
+};
+
+const radioGroupStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px'
+};
+
+const radioLabelStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    fontSize: '13px',
+    cursor: 'pointer',
+    color: '#00FF00'
+};
+
+const radioStyle = {
+    accentColor: '#00FF00',
+    cursor: 'pointer'
+};
+
+const sliderContainerStyle = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '5px'
+};
+
+const sliderLabelStyle = {
+    fontSize: '12px',
+    opacity: 0.8
 };
 
 const sliderStyle = {
-    accentColor: '#00F0FF',
-    width: '100%'
+    accentColor: '#00FF00',
+    width: '100%',
+    cursor: 'pointer'
 };
 
 const btnStyle = {
-    fontFamily: '"Orbitron", sans-serif',
+    fontFamily: '"Courier New", Courier, monospace',
     fontWeight: 'bold',
-    fontSize: '16px',
-    padding: '10px 30px',
+    fontSize: '14px',
+    padding: '10px 20px',
     cursor: 'pointer',
-    borderRadius: '4px',
     transition: 'all 0.2s ease',
     textTransform: 'uppercase',
-    letterSpacing: '2px'
+    letterSpacing: '1px',
+    flex: 1
 };
 
 const btnLaunch = {
     ...btnStyle,
-    background: 'rgba(0, 240, 255, 0.1)',
-    color: '#00F0FF',
-    border: '1px solid #00F0FF',
-    boxShadow: '0 0 10px rgba(0, 240, 255, 0.2)'
+    background: 'rgba(0, 255, 0, 0.1)',
+    color: '#00FF00',
+    border: '1px solid #00FF00',
+    boxShadow: '0 0 10px rgba(0, 255, 0, 0.2)'
 };
 
 const btnAbort = {
     ...btnStyle,
-    background: 'rgba(255, 0, 60, 0.1)',
-    color: '#FF003C',
-    border: '1px solid #FF003C',
-    boxShadow: '0 0 10px rgba(255, 0, 60, 0.2)'
+    background: 'rgba(255, 0, 0, 0.1)',
+    color: '#FF0000',
+    border: '1px solid #FF0000',
+    boxShadow: '0 0 10px rgba(255, 0, 0, 0.2)'
 };
