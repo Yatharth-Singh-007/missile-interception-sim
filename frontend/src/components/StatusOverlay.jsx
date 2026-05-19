@@ -6,16 +6,16 @@ export function StatusOverlay() {
 
     if (status === 'idle' || status === 'ACTIVE') return null;
 
-    const isIntercepted = status === 'INTERCEPTED';
-    const color = isIntercepted ? '#00F0FF' : '#FF003C';
-    const text = isIntercepted ? 'THREAT NEUTRALIZED' : 'THREAT MISSED - GROUND IMPACT';
-    const subtext = isIntercepted ? `IMPACT DETECTED AT T+ ${time.toFixed(2)}s` : `IMPACT DETECTED AT T+ ${time.toFixed(2)}s`;
+    const isIntercepted = status === 'INTERCEPTED'; // Wait, it's 'FINISHED' now globally, but anyway let's handle FINISHED
+    const color = status === 'FINISHED' ? '#00FF00' : '#FF0000';
+    const text = 'SIMULATION FINISHED';
+    const subtext = `COMPLETED AT T+ ${time.toFixed(2)}s`;
 
     return (
         <div style={overlayContainer}>
-            <div style={{...bannerStyle, borderColor: color, boxShadow: `0 0 40px ${color}40`, background: `rgba(0,0,0,0.85)`}}>
+            <div style={{...bannerStyle, borderColor: color, boxShadow: `0 0 40px ${color}40`, background: `rgba(0,15,0,0.85)`}}>
                 <h1 style={{...titleStyle, color: color, textShadow: `0 0 20px ${color}`}}>{text}</h1>
-                <h3 style={{...subStyle, color: '#FFF'}}>{subtext}</h3>
+                <h3 style={{...subStyle, color: '#00FF00'}}>{subtext}</h3>
             </div>
         </div>
     );
@@ -32,7 +32,7 @@ const overlayContainer = {
     alignItems: 'center',
     pointerEvents: 'none',
     zIndex: 20,
-    background: 'radial-gradient(circle, rgba(0,0,0,0) 0%, rgba(0,0,0,0.5) 100%)'
+    background: 'radial-gradient(circle, rgba(0,0,0,0) 0%, rgba(0,0,0,0.7) 100%)'
 };
 
 const bannerStyle = {
@@ -47,14 +47,15 @@ const bannerStyle = {
 };
 
 const titleStyle = {
-    fontFamily: '"Orbitron", sans-serif',
+    fontFamily: '"Courier New", Courier, monospace',
     fontSize: '48px',
     margin: '0 0 10px 0',
-    letterSpacing: '4px'
+    letterSpacing: '4px',
+    fontWeight: 'bold'
 };
 
 const subStyle = {
-    fontFamily: '"Rajdhani", sans-serif',
+    fontFamily: '"Courier New", Courier, monospace',
     fontSize: '24px',
     margin: 0,
     letterSpacing: '2px',
